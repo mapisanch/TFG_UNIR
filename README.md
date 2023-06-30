@@ -49,10 +49,10 @@ docker-compose down
 Copiamos el token generado para la aplicación Jupyter de los registros generados cuando se ejecutó `docker-compose`. Ahora necesitamos abrir `localhost:8888` y todo lo almacenado en la carpeta work se mantendrá en nuestra máquina, dentro de la carpeta `data/jupyter`. Esta posibilidad se ha configurado creando volúmenes en la definición de docker-compose.
 
 2. Minio
-Vamos a `localhost:9000` para abrir la interfaz de Minio.
+Vamos a `localhost:9001` para abrir la interfaz de Minio.
 
 3. MLFlow
-Vamos a `localhost:4000` para abrir la aplicación web del servidor MLFlow.
+Vamos a `localhost:5001` para abrir la aplicación web del servidor MLFlow.
 
 4. Base de datos Postgres
 No hay una vista web predeterminada implementada con docker-compose, pero siempre podemos descargar la aplicación [PgAdmin](https://www.pgadmin.org/download/) y configurarla utilizando los parámetros de servicio definidos en el archivo docker-compose.yaml.
