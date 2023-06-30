@@ -1,0 +1,90 @@
+version: '3'
+# al hacer el docker compose up, como son 4 servicios, se despliegan 4 máquinas virtuales. No son mv, son docker.
+services: # servicios que despliega a plataforma. RTodos los servicios se comunican entre sí
+  postgres-db: # cojo el servicio de la BBDD de una aimagen del repositorio de postgres en dockerhub. No tengo que tener nada.
+    container_name: postgres-db #todos estos datos con establecidos por el programador
+    image: postgres:14 # así se llama la imagen que te descargas en el pc
+    environment: # establecidas por el programador
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mlflow
+    networks:
+      - network # es la red global que hemos definido, para que los servicios se vena entre ellos
+    ports:
+      - "5432:5432" #es el puerto de la base de datos que ncesitamos para acceder. Primer número es el puerto de nuestro ordenador, y el segundo el del docker
+    volumes: 
+      - "./data/mlflow/db:/var/lib/postgresql/data" #mapeo de volúmenes=carpetas donde están los archivos, en este caso BBDD
+    restart: always # cuando pete, que se levante solo
+
+  mlflow-server: 
+    container_name: mlflow-server 
+    image: mlflow-server:latest #esta imagen no está en hub, esta se crea manualmente a través d eun docker file
+    build: #
+      context: . # el punto es donde estamos
+      dockerfile: mlflow/Dockerfile # archivo donde está la imagen
+    expose:
+      - "5001" #exponemos el puerto paraq ue vea desde fuera del docker
+    ports:
+      - "5001:5001" #mapeo
+    networks:
+      - network
+    restart: "unless-stopped" #que nunca lo reinicie a no ser que pare
+    volumes:
+      # /HOST:/CONTAINER
+      - "./data/mlflow/artifacts:/data/artifacts" #los ficheros que mlflow guarde en artofacts, yo los pueda ver también en mi pc
+    depends_on: # hasta que no esté levantado postgres no se levanta mlflow
+      - postgres-db
+    command: > # propiedades de mlflow. es el comando que se ejecuta dentro de la imagen. Levanta mlflow con esas propiedades
+      mlflow server
+      --host 0.0.0.0
+      --port 5001
+      --serve-artifacts
+      --artifacts-destination /data/artifacts
+      --backend-store-uri postgresql://postgres:postgres@postgres-db:5432/mlflow
+      --default-artifact-root /data/artifacts
+      --gunicorn-opts "--timeout 180 --log-level debug --access-logfile -"
+
+  jupyter:
+    image: jupyter:latest #map
+    build:
+      context: .
+      dockerfile: jupyter/Dockerfile
+    container_name: jupyter
+    ports:
+      - "8888:8888"
+    networks:
+      - network
+    volumes:
+      - ./data/jupyter:/home/jovyan/work
+    command: jupyter lab #este comando levanta jupyter
+    restart: always
+
+
+  minio: #para minio no hace falta tener un docker porque no hay que modificar. Solo los ponemos a comunicarse
+    image: minio/minio #imagen en dockerhub
+    container_name: minio_storage # un container es la imagen en ejecución
+    networks:
+      - network
+    ports:
+      - "9000:9000" # api back
+      - "9001:9001" #front.nesciata dos puertos
+    volumes:
+      - "./data/minio/:/minio_data"
+    environment: # parámetros de entorno cuando entras al localhost te pide logarte.
+      MINIO_ROOT_USER: user_minio
+      MINIO_ROOT_PASSWORD: p4ssW0rD #comando que necesita para ejcutarse
+    command: server --console-address ":9001" /data
+
+networks: # la red donde se levantan todos los servicios y se ven entre ellos
+  network:
+    driver: bridge
+
+volumes: # las carpetas para mapear las carpetas de los dockers.
+  postgres-db:
+    driver: local
+  mlflow-server:
+    driver: local
+  minio: 
+    driver: local
+  jupyter:
+    driver: local

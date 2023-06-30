@@ -1,0 +1,1 @@
+These are the logged metrics: [1, 2, 3]

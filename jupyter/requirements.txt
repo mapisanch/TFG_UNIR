@@ -1,0 +1,4 @@
+pandas
+mlflow
+psycopg2
+boto3
