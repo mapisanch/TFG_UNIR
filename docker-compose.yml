@@ -1,40 +1,46 @@
 version: '3'
-# El programa se ejecuta al hacer docker compose up, como son 4 servicios, se despliegan 4 dockers.
-services: # Servicios que despliega la plataforma. Todos los servicios se comunican entre sí.
-  postgres-db: # Servicio de la BBDD Postgres. No necesito tener nada, uso una imagen de Postgres del repositorio en Docker Hub*. 
-    container_name: postgres-db # Nombre que le damos al container. El container almacena la imagen en ejecución.
-    image: postgres:14 # Asignamos el nombre de la imagen que se descarga en nuestro PC.
-    environment: # Establecemos los datos del entorno para logarnos cuando lo pide al entrar al localhost.
+
+services:
+  postgres-db:
+    container_name: postgres-db
+    image: postgres:14
+    environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=mlflow
     networks:
-      - network # Asignamos la red network, que es la red global que hemos definido para que los servicios se vean entre ellos.
+      - network
     ports:
-      - "5432:5432" # Con esta asignación mapeamos la BBDD para acceder a ella. El primer número es el puerto de nuestro pc, y el segundo el del docker.
-    volumes: 
-      - "./data/mlflow/db:/var/lib/postgresql/data" # Mapeo de volúmenes o carpetas donde están los archivos, en este caso la BBDD.
-    restart: always # Indicamos que cuando el programa colapse se levante solo.
-
-  mlflow-server: # Servicio mlflow
-    container_name: mlflow-server # Nombre que le damos al container. El container almacena la imagen en ejecución.
-    image: mlflow-server:latest # Dado que esta imagen no está en Docker Hub, la creamos manualmente a través del Dockerfile (carpeta mlflow)
-    build: 
-      context: . # El punto inidca que vamos a ejecutar en el punto en el que estamos.
-      dockerfile: mlflow/Dockerfile # Apuntamos al archivo donde está la imagen, el Dockerfile mencionado.
+      - "5432:5432"
     expose:
-      - "5001" # Exponemos el puerto para que sea visible desde fuera del docker.
+      - 5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: always
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  mlflow-server:
+    container_name: mlflow-server
+    image: mlflow-server:latest
+    build:
+      context: .
+      dockerfile: mlflow/Dockerfile
+    expose:
+      - "5001"
     ports:
-      - "5001:5001" # Con esta asignación mapeamos el puerto de mlflow para acceder. El primer número es el puerto de nuestro pc, y el segundo el del mlflow.
+      - "5001:5001"
     networks:
-      - network # Asignamos la red network, que es la red global que hemos definido para que los servicios se vean entre ellos.
-    restart: "unless-stopped" #Indicamos que nunca reinicie el servicio a no ser que se detenga.
-    volumes: # Mapeo de volúmenes o carpetas donde están los archivos, en este caso conseguimos que los ficheros que mlflow guarde en artifacts, los podamos ver también en nuestro pc.
+      - network
+    restart: "unless-stopped"
+    volumes:
       # /HOST:/CONTAINER
-      - "./data/mlflow/artifacts:/data/artifacts" 
-    depends_on: # Indicamos que hasta que no esté levantado Postgres no se levante mlflow. Es decir, que mlflow depende el servicio de Postgres.
+      - "./data/mlflow/artifacts:/data/artifacts"
+    depends_on:
       - postgres-db
-    command: > # Ejecutamos dentro de la imagen este comando para que levante mlflow con estas propiedades.
+    command: >
       mlflow server
       --host 0.0.0.0
       --port 5001
@@ -44,51 +50,45 @@ services: # Servicios que despliega la plataforma. Todos los servicios se comuni
       --default-artifact-root /data/artifacts
       --gunicorn-opts "--timeout 180 --log-level debug --access-logfile -"
 
-  jupyter: # Servicio de jupyter
-    image: jupyter:latest # Dado que esta imagen no está en Docker Hub, la creamos manualmente a través del Dockerfile (carpeta jupyter)
+  jupyter:
     build:
       context: .
-      dockerfile: jupyter/Dockerfile # Apuntamos al archivo donde está la imagen, el Dockerfile mencionado.
-    container_name: jupyter # Nombre que le damos al container. El container almacena la imagen en ejecución.
+      dockerfile: jupyter/Dockerfile
+    container_name: jupyter
     ports:
-      - "8888:8888" # Con esta asignación mapeamos el puerto de jupyer para acceder. El primer número es el puerto de nuestro pc, y el segundo el del docker.
+      - "8888:8888"
     networks:
-      - network # Asignamos la red network, que es la red global que hemos definido para que los servicios se vean entre ellos.
-    volumes: # Mapeo de volúmenes o carpetas donde están los archivos para que los podamos ver también en nuestro pc. El segundo parámetro es el puerto de jupyer.
+      - network
+    volumes:
       - ./data/jupyter:/home/jovyan/work
-    command: jupyter lab # Al ejecutar este comando levantamos jupyter.
-    restart: always # Indicamos que reinicie siempre.
+    command: jupyter lab
+    restart: always
 
 
-  minio: # En el caso de minio no es necesario tener un docker porque no hay que modificar nada en él. Solo necesitamos comunicarnos con él.
-    image: minio/minio # Asignamos el nombre de la imagen que se descarga en nuestro PC.
-    container_name: minio_storage # Nombre que le damos al container. El container almacena la imagen en ejecución.
+  minio:
+    image: minio/minio
+    container_name: minio_storage
     networks:
-      - network # Asignamos la red network, que es la red global que hemos definido para que los servicios se vean entre ellos.
+      - network
     ports:
-      - "9000:9000" # Puerto de la API de backend
-      - "9001:9001" # Puerto del front. Necesita los dos puertos.
-    volumes: # Mapeo de volúmenes o carpetas donde están los archivos, para que los podamos ver también en nuestro pc.
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
       - "./data/minio/:/minio_data"
-    environment: # Establecemos los datos del entorno para logarnos cuando lo pide al entrar al localhost.
+    environment:
       MINIO_ROOT_USER: user_minio
-      MINIO_ROOT_PASSWORD: p4ssW0rD #comando que necesita para ejcutarse
-    command: server --console-address ":9001" /data # Comando de ejecución.
+      MINIO_ROOT_PASSWORD: p4ssW0rD
+    command: server --console-address ":9001" /data
 
-networks: # Esta es la red donde se levantan todos los servicios y se ven entre ellos.
+networks:
   network:
     driver: bridge
 
-volumes: # Estas son las carpetas para mapear las carpetas de los dockers.
-  postgres-db:
-    driver: local
+volumes:
+  postgres-data:
   mlflow-server:
     driver: local
   minio: 
     driver: local
   jupyter:
     driver: local
-  
-  
-  # *Docker Hub es un servicio en línea proporcionado por Docker que sirve como un registro de imágenes de contenedores. 
-  #Es un repositorio centralizado donde los desarrolladores y las organizaciones pueden almacenar, compartir y distribuir imágenes de contenedores Docker.
